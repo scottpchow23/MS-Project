@@ -110,17 +110,9 @@ def compute(data, index, question_id_index):
   averages = []
   for question_id in QUESTIONS:
     question_index = index[question_id]
-    total = 0.0
-    for response_index, response in enumerate(data):
-      raw_value = response[question_index]
-      if raw_value == '':
-        raw_value = '0'
-      value = convert_raw_value(raw_value)
-      total += value
-    average = total / len(data)
+    average = data[:, question_index].astype(np.float).mean()
     averages.append(average)
-    print(f'{question_id} "{question_id_index[question_index]}"" average: {average}')
-
+    print(f'{question_id} "{question_id_index[question_id]}"" average: {average:.4f}')
   return averages
 
 
@@ -166,11 +158,9 @@ def plot(data, index, question_text_index, plot_folder):
 def run():
   pretest_data, pretest_index, pretest_question_text_index = load_data_and_index('pretest.tsv')
   posttest_data, posttest_index, posttest_question_text_index = load_data_and_index('posttest.tsv')
-  print(pretest_data)
-  # pretest_averages = compute(pretest_data, pretest_index, pretest_question_text_index)
-  # posttest_averages = compute(posttest_data, posttest_index, posttest_question_text_index)
+  pretest_avgs = compute(pretest_data, QUESTIONS_INDEX, QUESTION_TEXT_INDEX)
   delta_data = compare(pretest_data, QUESTIONS_INDEX, posttest_data, QUESTIONS_INDEX)
-  print(delta_data)
+
   plot(pretest_data, QUESTIONS_INDEX, QUESTION_TEXT_INDEX, 'plots/pre')
   plot(posttest_data, QUESTIONS_INDEX, QUESTION_TEXT_INDEX, 'plots/post')
   plot(delta_data, QUESTIONS_INDEX, QUESTION_TEXT_INDEX, 'plots/delta')

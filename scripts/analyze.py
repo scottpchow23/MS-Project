@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy.core.defchararray import isnumeric
 
 AGREEMENT_SCALE = {
   'Strongly disagree': -2,
@@ -31,6 +32,34 @@ QUESTIONS = [
   'Q30',
 ]
 
+QUESTIONS_INDEX = {
+  'Q24_1': 0,
+  'Q24_2': 1,
+  'Q24_3': 2,
+  'Q24_4': 3,
+  'Q24_5': 4,
+  'Q25_1': 5,
+  'Q26_1': 6,
+  'Q27_1': 7,
+  'Q28_1': 8,
+  'Q29': 9,
+  'Q30': 10,
+}
+
+QUESTION_TEXT_INDEX = {
+  'Q24_1': 'I didn’t test my submission',
+  'Q24_2': 'I used pre-written tests/feedback from Gradescope',
+  'Q24_3': 'I added tests to the pre-written tests',
+  'Q24_4': 'I manually tested the program by running it',
+  'Q24_5': 'I wrote my own automated test suite',
+  'Q25_1': 'I feel uncomfortable figuring out how to set up testing for projects and assignments.',
+  'Q26_1': 'I feel that writing automated tests helps me catch more bugs in my code.',
+  'Q27_1': 'I usually wait to get the project working before I write automated tests.',
+  'Q28_1': 'I often do not write my own automated tests because I\'m unsure about how to set up tests/testing.',
+  'Q29': 'Suppose you spend 10 hours on a programming assignment. How many hours do you think you would spend on setting up/writing automated tests?',
+  'Q30': 'Suppose you spend 100 hours on a project. How many hours do you think you would spend on setting up/writing automated tests?',
+}
+
 def load_data_and_index(file_name):
   data = []
   column_id_index = {}
@@ -49,16 +78,33 @@ def load_data_and_index(file_name):
         response = line.split('\t')
         if len(response) != 79:
           response.append('')
-        data.append(response)
+        data.append([convert_raw_value(item) for item in response])
 
-  return np.array([np.array(response) for response in data]), column_id_index, question_id_index
+  column_indicies = []
+  for question_id, index in column_id_index.items():
+    if question_id in QUESTIONS:
+      column_indicies.append(index)
+
+  column_indicies.append(6) # add rfid column
+
+  all_data = np.array([np.array(response) for response in data])
+  return all_data[:, column_indicies], column_id_index, question_id_index
+
+def is_float(value):
+  try:
+    float(value)
+    return True
+  except ValueError:
+    return False
 
 def convert_raw_value(raw_value):
   if raw_value in AGREEMENT_SCALE:
     return AGREEMENT_SCALE[raw_value]
   if raw_value in TIME_SCALE:
     return TIME_SCALE[raw_value]
-  return float(raw_value)
+  if is_float(raw_value):
+    return float(raw_value)
+  return raw_value
 
 def compute(data, index, question_id_index):
   averages = []
@@ -82,26 +128,24 @@ def compare(pre_data, pre_index, post_data, post_index):
   total_deltas = [0.0] * len(QUESTIONS)
   matched_response_count = 0
   seen = {}
+  all_deltas = []
   for pre_response_index, pre_response in enumerate(pre_data):
-    id = pre_response[6]
+    id = pre_response[-1]
     for post_response_index, post_response in enumerate(post_data):
-      if id == post_response[6] and id not in seen:
+      if id == post_response[-1] and id not in seen:
         seen[id] = True
         matched_response_count += 1
+        response_deltas = []
         for question_index, question_id in enumerate(QUESTIONS):
           delta = convert_raw_value(post_response[post_index[question_id]]) - convert_raw_value(pre_response[pre_index[question_id]])
+          response_deltas.append(delta)
           total_deltas[question_index] += delta
+        all_deltas.append(response_deltas)
 
-  for pre_response_index, pre_response in enumerate(post_data):
-    if pre_response[6] not in seen:
-      print(pre_response_index, pre_response[6])
+  np_all_deltas = np.array(all_deltas)
 
-  if matched_response_count == 0:
-    print('No matches found; trivially returning 0s for averages.')
-    return total_deltas
-  print(f'{len(pre_data)}')
-  print(f'{matched_response_count} matches responses in pre and post datasets.')
-  return [total / matched_response_count for total in total_deltas]
+  print(f'{matched_response_count}/{min(len(pre_data), len(post_data))} matches responses in pre and post datasets.')
+  return np_all_deltas
 
 def plot(data, index, question_text_index, plot_folder):
   question_indicies = [index[question] for question in QUESTIONS]
@@ -109,8 +153,8 @@ def plot(data, index, question_text_index, plot_folder):
   for question_id, question_index in zip(QUESTIONS, question_indicies):
     raw_question_data = data[:, question_index] # get the column of data associated with a question
     question_data = np.array([convert_raw_value(response) for response in raw_question_data]) # convert raw values to numbers
-    question_text = question_text_index[question_index]
-    # plt.subplot(x=question_data, bins='auto', label=question_text)
+    question_text = question_text_index[question_id]
+
     fig, axes = plt.subplots()
     bins = np.arange(question_data.min(), question_data.max() + 1.5) - 0.5
     axes.hist(x=question_data, bins=bins)
@@ -122,12 +166,15 @@ def plot(data, index, question_text_index, plot_folder):
 def run():
   pretest_data, pretest_index, pretest_question_text_index = load_data_and_index('pretest.tsv')
   posttest_data, posttest_index, posttest_question_text_index = load_data_and_index('posttest.tsv')
-  pretest_averages = compute(pretest_data, pretest_index, pretest_question_text_index)
-  posttest_averages = compute(posttest_data, posttest_index, posttest_question_text_index)
-  deltas = compare(pretest_data, pretest_index, posttest_data, posttest_index)
-  print(list(zip(QUESTIONS, deltas)))
-  plot(pretest_data, pretest_index, pretest_question_text_index, 'plots/pre')
-  plot(posttest_data, posttest_index, posttest_question_text_index, 'plots/post')
+  print(pretest_data)
+  # pretest_averages = compute(pretest_data, pretest_index, pretest_question_text_index)
+  # posttest_averages = compute(posttest_data, posttest_index, posttest_question_text_index)
+  delta_data = compare(pretest_data, QUESTIONS_INDEX, posttest_data, QUESTIONS_INDEX)
+  print(delta_data)
+  plot(pretest_data, QUESTIONS_INDEX, QUESTION_TEXT_INDEX, 'plots/pre')
+  plot(posttest_data, QUESTIONS_INDEX, QUESTION_TEXT_INDEX, 'plots/post')
+  plot(delta_data, QUESTIONS_INDEX, QUESTION_TEXT_INDEX, 'plots/delta')
+
 
 if __name__ == '__main__':
   run()

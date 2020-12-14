@@ -158,7 +158,10 @@ def plot(data, index, question_text_index, plot_folder):
 def run():
   pretest_data, pretest_index, pretest_question_text_index = load_data_and_index('pretest.tsv')
   posttest_data, posttest_index, posttest_question_text_index = load_data_and_index('posttest.tsv')
+  print('pre-test averages')
   pretest_avgs = compute(pretest_data, QUESTIONS_INDEX, QUESTION_TEXT_INDEX)
+  print('post-test averages')
+  pretest_avgs = compute(posttest_data, QUESTIONS_INDEX, QUESTION_TEXT_INDEX)
   delta_data = compare(pretest_data, QUESTIONS_INDEX, posttest_data, QUESTIONS_INDEX)
 
   plot(pretest_data, QUESTIONS_INDEX, QUESTION_TEXT_INDEX, 'plots/pre')

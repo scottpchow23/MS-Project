@@ -6,6 +6,7 @@ AGREEMENT_SCALE = {
   'Strongly disagree': -2,
   'Somewhat disagree': -1,
   'Neither agree nor disagree': 0,
+  'Neutral': 0,
   'Somewhat agree': 1,
   'Strongly agree': 2
 }
@@ -85,7 +86,8 @@ def load_data_and_index(file_name):
     if question_id in QUESTIONS:
       column_indicies.append(index)
 
-  column_indicies.append(6) # add rfid column
+  rfid_column_index = 6 if file_name == 'pretest.tsv' else 1
+  column_indicies.append(rfid_column_index) # add rfid column
 
   all_data = np.array([np.array(response) for response in data])
   return all_data[:, column_indicies], column_id_index, question_id_index
@@ -136,7 +138,7 @@ def compare(pre_data, pre_index, post_data, post_index):
 
   np_all_deltas = np.array(all_deltas)
 
-  print(f'{matched_response_count}/{min(len(pre_data), len(post_data))} matches responses in pre and post datasets.')
+  print(f'{matched_response_count}/{max(len(pre_data), len(post_data))} matches responses in pre and post datasets.')
   return np_all_deltas
 
 def plot(data, index, question_text_index, plot_folder):
@@ -150,7 +152,8 @@ def plot(data, index, question_text_index, plot_folder):
     fig, axes = plt.subplots()
     bins = np.arange(question_data.min(), question_data.max() + 1.5) - 0.5
     axes.hist(x=question_data, bins=bins)
-    axes.title.set_text(question_text)
+    if False:
+      axes.title.set_text(question_text)
     axes.axvline(question_data.mean(), color='k', linestyle='dashed', linewidth=1)
     fig.savefig(f'{plot_folder}/{question_id}', bbox_inches='tight')
     plt.close(fig)
@@ -163,10 +166,15 @@ def run():
   print('post-test averages')
   compute(posttest_data, QUESTIONS_INDEX, QUESTION_TEXT_INDEX)
   delta_data = compare(pretest_data, QUESTIONS_INDEX, posttest_data, QUESTIONS_INDEX)
+  print('delta averages')
+  compute(delta_data, QUESTIONS_INDEX, QUESTION_TEXT_INDEX)
 
-  plot(pretest_data, QUESTIONS_INDEX, QUESTION_TEXT_INDEX, 'plots/pre')
-  plot(posttest_data, QUESTIONS_INDEX, QUESTION_TEXT_INDEX, 'plots/post')
-  plot(delta_data, QUESTIONS_INDEX, QUESTION_TEXT_INDEX, 'plots/delta')
+  print('creating pre-test graphs')
+  plot(pretest_data, QUESTIONS_INDEX, QUESTION_TEXT_INDEX, 'plots/no_titles/pre')
+  print('creating post-test graphs')
+  plot(posttest_data, QUESTIONS_INDEX, QUESTION_TEXT_INDEX, 'plots/no_titles/post')
+  print('creating delta graphs')
+  plot(delta_data, QUESTIONS_INDEX, QUESTION_TEXT_INDEX, 'plots/no_titles/delta')
 
 
 if __name__ == '__main__':
